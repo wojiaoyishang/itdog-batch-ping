@@ -17,6 +17,8 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
     :param cidr_filter:  是否过滤CIDR格式中的网络地址、网关地址、广播地址，True 或 False，默认为 True
     :param gateway:  最后一个是网关地址（last，默认） 还是 第一个是网关地址（first）
     """
+    if isinstance(host, str):
+        host = [host]
 
     headers = {
         'Referer': 'https://www.itdog.cn/batch_ping/',
@@ -24,10 +26,10 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
     }
 
     data = {
-        'host': host,  # 检测的IP
+        'host': "\r\n".join(host),  # 检测的IP
         'node_id': node_id,  # 节点ID，用“,”分割
         'cidr_filter': 'true' if cidr_filter else 'false',  # 过滤CIDR格式中的网络地址、网关地址、广播地址
-        'gateway': gateway # 最后一个是网关地址（last） 还是 第一个是网关地址（first）
+        'gateway': gateway  # 最后一个是网关地址（last） 还是 第一个是网关地址（first）
     }
 
     response = requests.post('https://www.itdog.cn/batch_ping/', headers=headers, data=data)
@@ -36,14 +38,14 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
     wss_url = pattern.search(response.content.decode()).group(1)
     pattern = re.compile(r"""var task_id='(.*)';""")
     task_id = pattern.search(response.content.decode()).group(1)
-    print(wss_url, task_id + "token_20230313000136kwyktxb0tgspm00yo5")
+    # print(wss_url, task_id + "token_20230313000136kwyktxb0tgspm00yo5")
     task_token = hashlib.md5((task_id + "token_20230313000136kwyktxb0tgspm00yo5").encode()).hexdigest()[8:-8]
 
     async def get_data():
         async with websockets.connect(wss_url) as websocket:
 
             await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
-            print(json.dumps({"task_id": task_id, "task_token": task_token}))
+            # print(json.dumps({"task_id": task_id, "task_token": task_token}))
 
             message = {}
             while not ("type" in message and message['type'] == "finished"):
@@ -52,14 +54,17 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
                     try:
                         message = json.loads(message)
                     except json.JSONDecodeError:
-                        print("服务器返回错误的信息：", message)
+                        # print("服务器返回错误的信息：", message)
                         break
                     callback(message)
                 except asyncio.TimeoutError:
                     await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
 
-            print("服务器测速完成，等待断开连接。")
+            # print("服务器测速完成，等待断开连接。")
             await websocket.close()
             # get_data_loop.close()
 
-    asyncio.get_event_loop().run_until_complete(get_data())
+    asyncio.run(get_data())
+
+
+itdog_batch_ping(["1.0.0.0", "1.0.0.1"], "1274,1226,1282,1150", lambda x: print(x))
