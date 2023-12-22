@@ -56,7 +56,8 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
                     except json.JSONDecodeError:
                         # print("服务器返回错误的信息：", message)
                         break
-                    callback(message)
+                    if not ("type" in message and message['type'] == "finished"):
+                        callback(message)
                 except asyncio.TimeoutError:
                     await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
 
