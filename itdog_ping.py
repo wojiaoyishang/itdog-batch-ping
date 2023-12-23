@@ -34,7 +34,13 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last", 
     }
 
     response = requests.post('https://www.itdog.cn/batch_ping/', headers=headers, data=data)
+    
 
+    pattern = re.compile(r"""err_tip_more\("<li>(.*)</li>"\)""")
+    err_tip = pattern.search(response.content.decode())
+    if err_tip:
+        raise ValueError(err_tip.group(1))
+    
     pattern = re.compile(r"""var wss_url='(.*)';""")
     wss_url = pattern.search(response.content.decode()).group(1)
     pattern = re.compile(r"""var task_id='(.*)';""")
