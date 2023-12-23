@@ -6,7 +6,7 @@ import websockets
 import requests
 
 
-def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
+def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last", timeout=10):
     """
     爬取 itdog 测速网站，批量 Ping 服务器。
 
@@ -16,6 +16,7 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
                     {'ip': '检测的IP地址', 'result': '延迟', 'node_id': '节点ID', 'task_num': 99（任务数）, 'address': '解析到的服务器地理位置'}
     :param cidr_filter:  是否过滤CIDR格式中的网络地址、网关地址、广播地址，True 或 False，默认为 True
     :param gateway:  最后一个是网关地址（last，默认） 还是 第一个是网关地址（first）
+    :param timeout:  最大等待服务器返回数据超时。
     """
     if isinstance(host, str):
         host = [host]
@@ -50,7 +51,7 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
             message = {}
             while not ("type" in message and message['type'] == "finished"):
                 try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=0.5)
+                    message = await asyncio.wait_for(websocket.recv(), timeout=timeout)
                     try:
                         message = json.loads(message)
                     except json.JSONDecodeError:
@@ -66,6 +67,3 @@ def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last"):
             # get_data_loop.close()
 
     asyncio.run(get_data())
-
-
-itdog_batch_ping(["1.0.0.0", "1.0.0.1"], "1274,1226,1282,1150", lambda x: print(x))
