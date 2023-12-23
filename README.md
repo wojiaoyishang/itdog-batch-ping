@@ -11,6 +11,8 @@
 
 ![输入图片说明](IMAGES/image9.png)
 
+![输入图片说明](IMAGES/image10.png)
+
 ### 代码示例
 
 你可以将 `itdog_ping.py` 作为模块导入，也可以直接修改该文件，总之要确保您可以调用到自定义函数 `itdog_batch_ping` 。
