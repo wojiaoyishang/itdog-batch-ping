@@ -5,6 +5,10 @@
 
 我原来打算的是使用这个测速网站来自选 Cloudflare 节点的，不知道还有没有时间将这个项目和 ddgth 大佬的项目 [cf2dns](https://github.com/ddgth/cf2dns) 联动起来。因为 ddgth 大佬的项目中的获取优质 Cloudflare 节点的算法是未开源的，而是通过请求网络 API 的方式从别的服务器获取 Cloudflare 节点。如果我学有余力，我会尝试去联动一下。ψ(*｀ー´)ψ
 
+### 更新
+
+2024.11.16 由于 itdog 设置 Cookie 效验反爬，程序进行修改，并增加网站测速爬虫。
+
 ### 分析数据
 
 我自己编写了一些爬虫，生成了一下 Cloudflare 的节点测速结果，放在目录 `Cloudflare_Data` 下，需要的同学或老师可以自行下载。

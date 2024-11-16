@@ -1,75 +1,130 @@
 import re
 import json
+import base64
 import hashlib
 import asyncio
-import websockets
 import requests
+import websockets
+
+from urllib.parse import urlparse
+
+session = requests.Session()
 
 
-def itdog_batch_ping(host, node_id, callback, cidr_filter=True, gateway="last", timeout=10):
-    """
-    爬取 itdog 测速网站，批量 Ping 服务器。
+def x(input_str, key):
+    output = ""
+    key = key + "PTNo2n3Ev5"
+    for i, char in enumerate(input_str):
+        char_code = ord(char) ^ ord(key[i % len(key)])
+        output += chr(char_code)
+    return output
 
-    :param host: 检测的IP地址，参考：域名或IPv4，每行一个，IP可填入范围和CIDR形式，可混合，最多支持256个检测目标 / 1万个字符。（传入列表，每一个项代表一行）
-    :param node_id: 节点ID，使用“,”分隔。参考：1274,1226,1282,1150
-    :param callback: 检测结果回调函数，回调函数应该提供一个参数，用于接收字典。参考字典：
-                    {'ip': '检测的IP地址', 'result': '延迟', 'node_id': '节点ID', 'task_num': 99（任务数）, 'address': '解析到的服务器地理位置'}
-    :param cidr_filter:  是否过滤CIDR格式中的网络地址、网关地址、广播地址，True 或 False，默认为 True
-    :param gateway:  最后一个是网关地址（last，默认） 还是 第一个是网关地址（first）
-    :param timeout:  最大等待服务器返回数据超时。
-    """
-    if isinstance(host, str):
-        host = [host]
 
+def set_ret(_0x132031):
+    _0x1db96b = _0x132031[:8]
+    _0x6339b6 = int(_0x132031[12:]) if len(_0x132031) > 12 else 0
+    _0x56549e = _0x6339b6 * 2 + 18 - 2
+    encrypted = x(str(_0x56549e), _0x1db96b)
+    guard_encrypted = base64.b64encode(encrypted.encode()).decode()
+    return guard_encrypted
+
+
+async def get_data(wss_url, task_id, task_token):
+    async with websockets.connect(wss_url) as websocket:
+
+        await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
+        # print(json.dumps({"task_id": task_id, "task_token": task_token}))
+
+        message = {}
+        while not ("type" in message and message['type'] == "finished"):
+            try:
+                message = await asyncio.wait_for(websocket.recv(), timeout=5)
+                try:
+                    message = json.loads(message)
+
+                    if 'type' in message and message['type'] == 'finished':
+                        break
+
+                    if 'head' not in message or message['head'] == '':
+                        print(f"({message['name']})\tIP: {message['ip']}\t请求失败")
+                        return
+
+
+                    print(message)
+
+                except json.JSONDecodeError:
+                    # print("服务器返回错误的信息：", message)
+                    break
+            except asyncio.TimeoutError:
+                return
+                # await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
+
+        print("服务器测速完成，等待断开连接。")
+        await websocket.close()
+
+
+async def cloudflare_hit(url):
     headers = {
-        'Referer': 'https://www.itdog.cn/batch_ping/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'cache-control': 'no-cache',
+        'content-type': 'application/x-www-form-urlencoded',
+        'origin': 'https://www.itdog.cn',
+        'pragma': 'no-cache',
+        'priority': 'u=0, i',
+        'referer': 'https://www.itdog.cn/http/',
+        'sec-ch-ua': '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
     }
 
     data = {
-        'host': "\r\n".join(host),  # 检测的IP
-        'node_id': node_id,  # 节点ID，用“,”分割
-        'cidr_filter': 'true' if cidr_filter else 'false',  # 过滤CIDR格式中的网络地址、网关地址、广播地址
-        'gateway': gateway  # 最后一个是网关地址（last） 还是 第一个是网关地址（first）
+        'line': '',
+        'host': url,
+        'host_s': urlparse(url).hostname,
+        'check_mode': 'fast',
+        'ipv4': '',
+        'method': 'get',
+        'referer': '',
+        'ua': '',
+        'cookies': '',
+        'redirect_num': '5',
+        'dns_server_type': 'isp',
+        'dns_server': '',
     }
 
-    response = requests.post('https://www.itdog.cn/batch_ping/', headers=headers, data=data)
-    
+    if 'guardret' not in session.cookies:
+        session.post('https://www.itdog.cn/http/', headers=headers, data=data)
 
-    pattern = re.compile(r"""err_tip_more\("<li>(.*)</li>"\)""")
-    err_tip = pattern.search(response.content.decode())
-    if err_tip:
-        raise ValueError(err_tip.group(1))
-    
+    if 'guard' in session.cookies:
+        session.cookies['guardret'] = set_ret(session.cookies['guard'])
+
+    response = session.post('https://www.itdog.cn/http/', headers=headers, data=data)
+
     pattern = re.compile(r"""var wss_url='(.*)';""")
     wss_url = pattern.search(response.content.decode()).group(1)
     pattern = re.compile(r"""var task_id='(.*)';""")
     task_id = pattern.search(response.content.decode()).group(1)
-    # print(wss_url, task_id + "token_20230313000136kwyktxb0tgspm00yo5")
+
     task_token = hashlib.md5((task_id + "token_20230313000136kwyktxb0tgspm00yo5").encode()).hexdigest()[8:-8]
 
-    async def get_data():
-        async with websockets.connect(wss_url) as websocket:
+    try:
+        await get_data(wss_url, task_id, task_token)
+    except Exception as e:
+        pass
 
-            await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
-            # print(json.dumps({"task_id": task_id, "task_token": task_token}))
 
-            message = {}
-            while not ("type" in message and message['type'] == "finished"):
-                try:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=timeout)
-                    try:
-                        message = json.loads(message)
-                    except json.JSONDecodeError:
-                        # print("服务器返回错误的信息：", message)
-                        break
-                    if not ("type" in message and message['type'] == "finished"):
-                        callback(message)
-                except asyncio.TimeoutError:
-                    await websocket.send(json.dumps({"task_id": task_id, "task_token": task_token}))
+async def main():
+    await cloudflare_hit("https://www.baidu.com")
 
-            # print("服务器测速完成，等待断开连接。")
-            await websocket.close()
-            # get_data_loop.close()
 
-    asyncio.run(get_data())
+if __name__ == '__main__':
+    asyncio.run(
+        main()
+    )
