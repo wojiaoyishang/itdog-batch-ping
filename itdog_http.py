@@ -49,10 +49,8 @@ async def get_data(wss_url, task_id, task_token):
                         print(f"({message['name']})\tIP: {message['ip']}\t请求失败")
                         return
 
-                    match = re.search(r"(CF-Cache-Status: .*?)<br>", message['head'])
 
-                    if match:
-                        print(message)
+                    print(message)
 
                 except json.JSONDecodeError:
                     # print("服务器返回错误的信息：", message)
